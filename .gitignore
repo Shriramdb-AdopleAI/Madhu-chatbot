@@ -1,0 +1,46 @@
+# Dependencies
+frontend/node_modules/
+backend/.venv/
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# Environment variables
+.env
+.env.local
+.env.production
+frontend/.env
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+
+# Database
+*.db
+
+# FAISS index files
+backend/faiss_index.faiss
+backend/faiss_index.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+
+# Vite
+frontend/.vite/
