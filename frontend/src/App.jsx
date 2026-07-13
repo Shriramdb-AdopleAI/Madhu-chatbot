@@ -15,10 +15,8 @@ function App() {
   return (
     <BrowserRouter>
       <Suspense fallback={
-        <div className="auth-container">
-          <div className="status-badge" style={{margin: 'auto'}}>
-            <span className="pulse"></span> Loading Interface...
-          </div>
+        <div className="loading-screen">
+          <div className="loading-spinner"></div>
         </div>
       }>
         <Routes>

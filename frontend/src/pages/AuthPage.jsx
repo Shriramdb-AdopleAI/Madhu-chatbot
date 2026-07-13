@@ -6,7 +6,7 @@ import {
   updateProfile,
   signInWithPopup
 } from 'firebase/auth';
-import '../App.css';
+import { Sparkles } from 'lucide-react';
 
 export default function AuthPage({ setUser }) {
   const [authMode, setAuthMode] = useState('login');
@@ -86,24 +86,29 @@ export default function AuthPage({ setUser }) {
   };
 
   return (
-    <div className="auth-container">
-      <div className="glass-background"></div>
-      <div className="auth-card glass-panel">
-        <div className="sidebar-brand auth-brand">
-          <div className="logo-container">
-            <div className="logo-icon">✨</div>
-            <h1>Nexus<span className="gradient-text">RAG</span></h1>
+    <div className="auth-page">
+      <div className="auth-bg-gradient" />
+      <div className="auth-card">
+        <div className="auth-brand">
+          <div className="auth-brand-icon">
+            <Sparkles size={20} />
           </div>
+          <div className="auth-brand-name">Nexus<span>RAG</span></div>
         </div>
-        <h2 className="auth-title">{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
+
+        <h2 className="auth-title">{authMode === 'login' ? 'Welcome back' : 'Create account'}</h2>
+        <p className="auth-subtitle">
+          {authMode === 'login' ? 'Sign in to access your knowledge base' : 'Get started with your AI assistant'}
+        </p>
 
         {authError && <div className="auth-error">{authError}</div>}
 
         <form onSubmit={handleAuth} className="auth-form">
           {authMode === 'signup' && (
             <div className="form-group">
-              <label>Username</label>
+              <label className="form-label">Username</label>
               <input
+                className="form-input"
                 type="text"
                 value={username}
                 onChange={e => setUsername(e.target.value)}
@@ -113,18 +118,20 @@ export default function AuthPage({ setUser }) {
             </div>
           )}
           <div className="form-group">
-            <label>Email Address</label>
+            <label className="form-label">Email</label>
             <input
+              className="form-input"
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="Enter email"
+              placeholder="you@example.com"
               required
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <label className="form-label">Password</label>
             <input
+              className="form-input"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -134,8 +141,9 @@ export default function AuthPage({ setUser }) {
           </div>
           {authMode === 'signup' && (
             <div className="form-group">
-              <label>Confirm Password</label>
+              <label className="form-label">Confirm Password</label>
               <input
+                className="form-input"
                 type="password"
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
@@ -144,19 +152,19 @@ export default function AuthPage({ setUser }) {
               />
             </div>
           )}
-          <button type="submit" disabled={isLoadingAuth} className="auth-button">
-            {isLoadingAuth ? 'Processing...' : (authMode === 'login' ? 'Log In' : 'Sign Up')}
+          <button type="submit" disabled={isLoadingAuth} className="auth-submit-btn">
+            {isLoadingAuth ? 'Processing...' : (authMode === 'login' ? 'Sign In' : 'Create Account')}
           </button>
         </form>
 
         <div className="auth-divider">
-          <span>OR</span>
+          <span>or</span>
         </div>
 
         <button
           onClick={handleGoogleLogin}
           disabled={isLoadingAuth}
-          className="google-auth-button"
+          className="google-auth-btn"
         >
           <svg width="18" height="18" viewBox="0 0 48 48">
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -169,8 +177,8 @@ export default function AuthPage({ setUser }) {
 
         <div className="auth-switch">
           {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
-          <span role="button" onClick={() => {setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthError('');}}>
-            {authMode === 'login' ? 'Sign Up' : 'Log In'}
+          <span className="auth-switch-link" onClick={() => {setAuthMode(authMode === 'login' ? 'signup' : 'login'); setAuthError('');}}>
+            {authMode === 'login' ? 'Sign Up' : 'Sign In'}
           </span>
         </div>
       </div>

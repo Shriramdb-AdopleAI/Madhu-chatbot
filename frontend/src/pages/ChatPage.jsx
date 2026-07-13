@@ -1,10 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../App.css';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import {
+  Sparkles, Plus, Search, MessageSquare, Trash2, Settings,
+  Send, Paperclip, FileText, CheckCircle2, File,
+  BarChart3, Brain, FolderSearch, TrendingUp, Menu, X
+} from 'lucide-react';
 
 export default function ChatPage({ user, setUser }) {
   const navigate = useNavigate();
-  
+
   const [chats, setChats] = useState(() => {
     const savedChats = localStorage.getItem('rag_chats');
     return savedChats ? JSON.parse(savedChats) : [{
@@ -42,7 +48,6 @@ export default function ChatPage({ user, setUser }) {
     setChats(prevChats => prevChats.map(chat => {
       if (chat.id === activeChatId) {
         const newMessages = chat.messages.filter(msg => msg.id !== messageId);
-        // If all messages deleted, keep at least one welcome message
         if (newMessages.length === 0) {
           newMessages.push({ id: Date.now(), role: 'ai', content: 'Hello! I am your AI assistant. Upload some documents on the right and ask me anything about them.' });
         }
@@ -72,6 +77,12 @@ export default function ChatPage({ user, setUser }) {
   };
 
   const startNewChat = () => {
+    const existingEmpty = chats.find(c => c.title === 'New Chat');
+    if (existingEmpty) {
+      setActiveChatId(existingEmpty.id);
+      setSidebarOpen(false);
+      return;
+    }
     const newChat = {
       id: Date.now(),
       title: 'New Chat',
@@ -79,6 +90,7 @@ export default function ChatPage({ user, setUser }) {
     };
     setChats(prev => [newChat, ...prev]);
     setActiveChatId(newChat.id);
+    setSidebarOpen(false);
   };
 
   useEffect(() => {
@@ -91,6 +103,8 @@ export default function ChatPage({ user, setUser }) {
   const [showIndexedFiles, setShowIndexedFiles] = useState(false);
   const [indexedFiles, setIndexedFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const fetchIndexedFiles = async () => {
     try {
@@ -112,14 +126,27 @@ export default function ChatPage({ user, setUser }) {
   };
 
   const toggleFileSelection = (filename) => {
-    setSelectedFiles(prev => 
-      prev.includes(filename) 
-        ? prev.filter(f => f !== filename) 
+    setSelectedFiles(prev =>
+      prev.includes(filename)
+        ? prev.filter(f => f !== filename)
         : [...prev, filename]
     );
   };
 
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+  const filesDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!showIndexedFiles) return;
+    const handleClickOutside = (e) => {
+      if (filesDropdownRef.current && !filesDropdownRef.current.contains(e.target) && !e.target.closest('.chat-input-files-btn')) {
+        setShowIndexedFiles(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showIndexedFiles]);
 
   const handleLogout = () => {
     setUser(null);
@@ -143,12 +170,13 @@ export default function ChatPage({ user, setUser }) {
     updateMessages(newMessages);
     setInput('');
     setIsTyping(true);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
     try {
       const response = await fetch('http://localhost:8000/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           question: userMsg,
           selectedFiles: selectedFiles.length > 0 ? selectedFiles : []
         })
@@ -169,218 +197,244 @@ export default function ChatPage({ user, setUser }) {
     }
   };
 
-  return (
-    <div className="app-container">
-      <div className="glass-background"></div>
-      
-      <main className="main-content dashboard-layout">
-        <div className="content-grid full-height">
-          {/* Left Sidebar - Chat History */}
-          <aside className="left-sidebar glass-panel">
-            <div className="sidebar-brand">
-              <div className="logo-container">
-                <div className="logo-icon">✨</div>
-                <h1>Nexus<span className="gradient-text">RAG</span></h1>
-              </div>
-            </div>
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage(e);
+    }
+  };
 
-            <div className="left-sidebar-header">
-              <button className="new-chat-btn" onClick={startNewChat}>
-                <span className="icon">＋</span> New Chat
+  const handleTextareaChange = (e) => {
+    setInput(e.target.value);
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px';
+  };
+
+  const filteredChats = searchQuery
+    ? chats.filter(c => c.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : chats;
+
+  const isWelcomeState = messages.length <= 1 && messages[0]?.role === 'ai' && activeChat.title === 'New Chat';
+
+  const suggestions = [
+    { icon: FileText, text: 'Summarize this document' },
+    { icon: BarChart3, text: 'Analyze uploaded report' },
+    { icon: Brain, text: 'Explain key concepts' },
+    { icon: FolderSearch, text: 'Search my documents' },
+    { icon: TrendingUp, text: 'Generate insights' },
+  ];
+
+  const handleSuggestionClick = (text) => {
+    setInput(text);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
+  return (
+    <div className="app-layout">
+      {sidebarOpen && <div className="mobile-overlay" onClick={() => setSidebarOpen(false)} />}
+
+      {/* Sidebar */}
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-header">
+          <div className="sidebar-brand">
+            <div className="sidebar-brand-icon">
+              <Sparkles size={18} />
+            </div>
+            <div className="sidebar-brand-name">Nexus<span>RAG</span></div>
+          </div>
+          <button className="new-chat-btn" onClick={startNewChat}>
+            <Plus size={16} /> New Chat
+          </button>
+        </div>
+
+        <div className="sidebar-search">
+          <div className="sidebar-search-wrapper">
+            <Search size={14} className="sidebar-search-icon" />
+            <input
+              className="sidebar-search-input"
+              type="text"
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="chat-list">
+          <div className="chat-list-group-label">Recent</div>
+          {filteredChats.map(chat => (
+            <div
+              key={chat.id}
+              className={`chat-list-item ${chat.id === activeChatId ? 'active' : ''}`}
+              onClick={() => { setActiveChatId(chat.id); setSidebarOpen(false); }}
+            >
+              <MessageSquare size={15} className="chat-list-item-icon" />
+              <span className="chat-list-item-title">{chat.title}</span>
+              <button
+                className="chat-list-item-delete"
+                onClick={(e) => deleteChat(e, chat.id)}
+                title="Delete chat"
+              >
+                <Trash2 size={14} />
               </button>
             </div>
-            
-            <div className="chat-history-list">
-              {chats.map(chat => (
-                <div 
-                  key={chat.id} 
-                  className={`chat-history-item ${chat.id === activeChatId ? 'active' : ''}`}
-                  onClick={() => setActiveChatId(chat.id)}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}
-                >
-                  <span className="chat-title" style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', paddingRight: '1rem' }}>{chat.title}</span>
-                  <button 
-                    className="delete-chat-btn"
-                    onClick={(e) => deleteChat(e, chat.id)}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: 'var(--text-secondary)', 
-                      cursor: 'pointer', 
-                      padding: '4px',
-                      borderRadius: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: chat.id === activeChatId ? 1 : 0,
-                    }}
-                    title="Delete chat session"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="3 6 5 6 21 6"></polyline>
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                  </button>
+          ))}
+        </div>
+
+        <div className="sidebar-footer">
+          <button className="sidebar-admin-btn" onClick={() => navigate('/admin')}>
+            <Settings size={15} /> Admin Portal
+          </button>
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">
+              {user.username.charAt(0).toUpperCase()}
+            </div>
+            <div className="sidebar-user-info">
+              <span className="sidebar-user-name">{user.username}</span>
+              <span className="sidebar-user-logout" onClick={handleLogout}>Sign out</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Chat Area */}
+      <div className="chat-main">
+        <div className="mobile-header">
+          <button className="mobile-menu-btn" onClick={() => setSidebarOpen(true)}>
+            <Menu size={20} />
+          </button>
+        </div>
+
+        {isWelcomeState ? (
+          <div className="welcome-screen">
+            <div className="welcome-icon">
+              <Sparkles size={28} />
+            </div>
+            <h1 className="welcome-title">Your Personal AI Knowledge Assistant</h1>
+            <p className="welcome-subtitle">
+              Upload documents, ask questions, and instantly retrieve accurate answers from your private knowledge base.
+            </p>
+            <div className="welcome-suggestions">
+              {suggestions.map((s, i) => (
+                <div key={i} className="suggestion-card" onClick={() => handleSuggestionClick(s.text)}>
+                  <div className="suggestion-card-icon">
+                    <s.icon size={18} />
+                  </div>
+                  <span className="suggestion-card-text">{s.text}</span>
                 </div>
               ))}
             </div>
-
-            <button 
-              className="new-chat-btn" 
-              style={{background: 'var(--accent-gradient)', color: 'white', border: 'none', marginTop: 'auto'}} 
-              onClick={() => navigate('/admin')}
-            >
-              <span className="icon">⚙️</span> Admin Portal
-            </button>
-
-            <div className="user-profile" style={{marginTop: '0'}}>
-              <div className="user-avatar">{user.username.charAt(0).toUpperCase()}</div>
-              <div className="user-info">
-                <span className="user-name">{user.username}</span>
-                <span className="user-role logout-btn" onClick={handleLogout}>Log Out</span>
-              </div>
-            </div>
-          </aside>
-
-          {/* Chat Interface */}
-          <section className="chat-section glass-panel">
-            <div className="chat-messages">
+          </div>
+        ) : (
+          <div className="chat-messages">
+            <div className="chat-messages-inner">
               {messages.map((msg) => (
-                <div key={msg.id} className={`message-wrapper ${msg.role}`}>
-                  <div className={`message-avatar ${msg.role}`}>
-                    {msg.role === 'ai' ? '🤖' : '👤'}
+                <div key={msg.id} className={`message ${msg.role === 'user' ? 'user' : 'ai'}`}>
+                  <div className="message-avatar">
+                    {msg.role === 'ai' ? <Sparkles size={15} /> : user.username.charAt(0).toUpperCase()}
                   </div>
-                  <div className="message-bubble">
-                    {msg.content}
+                  <div className="message-content">
+                    {msg.role === 'ai' ? (
+                      <div className="message-bubble markdown-body">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                        </ReactMarkdown>
+                      </div>
+                    ) : (
+                      <div className="message-bubble">{msg.content}</div>
+                    )}
                   </div>
-                  {msg.role === 'user' && (
-                    <button
-                      className="delete-message-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteMessage(msg.id);
-                      }}
-                      title="Delete message"
-                    >
-                      ×
-                    </button>
-                  )}
                 </div>
               ))}
               {isTyping && (
-                <div className="message-wrapper ai">
-                  <div className="message-avatar ai">🤖</div>
-                  <div className="message-bubble typing-indicator">
-                    <span></span><span></span><span></span>
+                <div className="message ai">
+                  <div className="message-avatar">
+                    <Sparkles size={15} />
+                  </div>
+                  <div className="message-content">
+                    <div className="message-bubble typing-indicator">
+                      <span></span><span></span><span></span>
+                    </div>
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
+          </div>
+        )}
 
-            <form className="chat-input-form" onSubmit={handleSendMessage} style={{ position: 'relative', display: 'flex', gap: '0.75rem', alignItems: 'center', padding: '1rem 1.5rem', background: 'transparent', borderTop: '1px solid var(--glass-border-dark)' }}>
-              
-              <button 
+        {/* Input Area */}
+        <div className="chat-input-container">
+          <div className="chat-input-wrapper">
+            {/* Files Dropdown */}
+            {showIndexedFiles && (
+              <div className="files-dropdown" ref={filesDropdownRef}>
+                <div className="files-dropdown-header">
+                  <span className="files-dropdown-title">Knowledge Base</span>
+                  <span className="files-dropdown-count">{indexedFiles.length} files</span>
+                </div>
+                <div className="files-dropdown-list">
+                  {indexedFiles.length === 0 ? (
+                    <div className="files-dropdown-empty">No files indexed yet.</div>
+                  ) : (
+                    indexedFiles.map((f, i) => {
+                      const isSelected = selectedFiles.includes(f);
+                      return (
+                        <div
+                          key={i}
+                          className={`files-dropdown-item ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleFileSelection(f)}
+                        >
+                          {isSelected ? <CheckCircle2 size={15} className="files-dropdown-item-icon" /> : <File size={15} className="files-dropdown-item-icon" />}
+                          <span className="files-dropdown-item-name">{f}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleSendMessage} className="chat-input-box">
+              <button
                 type="button"
+                className={`chat-input-files-btn ${showIndexedFiles ? 'active' : ''}`}
                 onClick={toggleFilesDropdown}
-                className="docs-button"
-                style={{ 
-                  background: showIndexedFiles ? '#f1f5f9' : 'white', 
-                  color: selectedFiles.length > 0 ? 'var(--accent-1)' : '#475569', 
-                  border: selectedFiles.length > 0 ? '1.5px solid var(--accent-1)' : '1.5px solid #e2e8f0', 
-                  borderRadius: '50px', 
-                  width: '64px', 
-                  height: '44px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'center', 
-                  position: 'relative',
-                  padding: '0', 
-                  flexShrink: 0, 
-                  cursor: 'pointer', 
-                  transition: 'all 0.2s', 
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.02)' 
-                }}
-                title="View Indexed Files"
+                title="Select documents"
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="9" y1="15" x2="15" y2="15"></line>
-                  <line x1="9" y1="11" x2="12" y2="11"></line>
-                </svg>
+                <Paperclip size={18} />
                 {selectedFiles.length > 0 && (
-                  <span style={{ position: 'absolute', top: '-5px', right: '-5px', background: 'var(--accent-1)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                    {selectedFiles.length}
-                  </span>
+                  <span className="chat-input-files-badge">{selectedFiles.length}</span>
                 )}
               </button>
 
-              <input
-                type="text"
+              <textarea
+                ref={textareaRef}
+                rows={1}
                 placeholder="Ask something about your documents..."
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={handleTextareaChange}
+                onKeyDown={handleKeyDown}
                 disabled={isTyping}
-                style={{ flex: 1, background: 'white', border: '1.5px solid #e2e8f0', height: '44px', borderRadius: '50px', padding: '0 1.25rem', fontSize: '0.95rem', outline: 'none', margin: '0', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)' }}
               />
 
-              <button 
-                type="submit" 
-                className="send-button-pill"
+              <button
+                type="submit"
+                className="chat-input-send-btn"
                 disabled={!input.trim() || isTyping}
-                style={{ background: (!input.trim() || isTyping) ? '#b0b5c1' : 'var(--accent-1)', color: 'white', border: 'none', borderRadius: '50px', width: '64px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0', flexShrink: 0, cursor: (!input.trim() || isTyping) ? 'not-allowed' : 'pointer', transition: 'all 0.2s', boxShadow: (!input.trim() || isTyping) ? 'none' : '0 2px 6px rgba(59,130,246,0.3)' }}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="22" y1="2" x2="11" y2="13"></line>
-                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
+                <Send size={16} />
               </button>
-
-              {/* Indexed Files Dropdown */}
-              {showIndexedFiles && (
-                <div style={{ position: 'absolute', bottom: 'calc(100% + 0.5rem)', left: '1.5rem', width: '300px', maxHeight: '350px', overflowY: 'auto', zIndex: 50, padding: '1.25rem', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-                    <h4 style={{ margin: '0', fontSize: '0.95rem', color: 'var(--text-primary)' }}>Indexed Knowledge Base</h4>
-                    <span style={{ fontSize: '0.75rem', background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '10px', color: 'var(--text-secondary)' }}>{indexedFiles.length} files</span>
-                  </div>
-                  {indexedFiles.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', textAlign: 'center', padding: '1rem 0' }}>No files currently indexed.</p>
-                  ) : (
-                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {indexedFiles.map((f, i) => {
-                        const isSelected = selectedFiles.includes(f);
-                        return (
-                          <li 
-                            key={i} 
-                            onClick={() => toggleFileSelection(f)}
-                            style={{ 
-                              fontSize: '0.85rem', 
-                              color: isSelected ? 'var(--accent-1)' : 'var(--text-secondary)', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: '0.75rem', 
-                              background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(0,0,0,0.02)', 
-                              border: isSelected ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent',
-                              padding: '0.6rem 0.8rem', 
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s'
-                            }}
-                          >
-                            <span style={{ color: isSelected ? 'var(--accent-1)' : '#cbd5e1' }}>{isSelected ? '✅' : '📄'}</span> 
-                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: isSelected ? '600' : '500' }}>{f}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              )}
             </form>
-          </section>
+
+            <div className="chat-input-hint">
+              <kbd>Enter</kbd> to send, <kbd>Shift + Enter</kbd> for new line
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
